@@ -2,5 +2,6 @@ site_name: 卷得飞起的中大人社Official
 nav: 
   - 主页: index.md
   - 关于我: about.md
+  - 社员专栏: member.md
 theme:
   name: readthedocs
