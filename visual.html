@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>摄像头检测数据可视化</title>
+    <style>
+        .data-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .time { color: #666; font-size: 12px; }
+        .result { font-weight: bold; color: #2c3e50; }
+        .value { color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <h1>摄像头检测数据（实时更新）</h1>
+    <div id="data-container"></div>
+
+    <script>
+        const API_BASE = "http://10.44.226.207:5000/api";
+
+        async function loadData() {
+            try {
+                const response = await fetch(API_BASE + "/get_data");
+                const result = await response.json();
+                console.log("API返回:", result); // 调试用，看数据是否正常
+
+                const container = document.getElementById('data-container');
+                container.innerHTML = '';
+
+                if (result.code === 200 && result.data && result.data.length > 0) {
+                    result.data.forEach(function(item) {
+                        const card = document.createElement('div');
+                        card.className = 'data-card';
+                        card.innerHTML = 
+                            '<div class="time">' + item.create_time + '</div>' +
+                            '<div class="result">检测结果：' + item.detect_result + '</div>' +
+                            '<div>置信度：<span class="value">' + item.value + '</span></div>' +
+                            '<div>图像ID：' + item.image_id + '</div>';
+                        container.appendChild(card);
+                    });
+                } else {
+                    container.innerHTML = '<p>暂无检测数据</p>';
+                }
+            } catch (error) {
+                console.error("错误:", error);
+                document.getElementById('data-container').innerHTML = 
+                    '<p style="color:red">连接后端失败，请检查服务是否启动</p>';
+            }
+        }
+
+        loadData();
+        setInterval(loadData, 5000);
+    </script>
+</body>
+</html>
