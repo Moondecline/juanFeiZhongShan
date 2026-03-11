@@ -1,3 +1,5 @@
+# 共享单车检测数据（IoTDA+OBS）
+
 {% raw %}
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -28,7 +30,7 @@
     </table>
 
     <script>
-        // 指向 IoTDA 实际写入的 camera_data 文件
+        // 指向你 OBS 里的 camera_data 文件
         const OBS_URL = "https://iotda-camera-data.obs.cn-south-1.myhuaweicloud.com/camera_data";
 
         function loadData() {
@@ -46,14 +48,14 @@
                 tbody.innerHTML = "";
                 let item = {};
 
-                // 适配 IoTDA 原始数据格式
-                if (data.services && data.services[0]?.properties) {
-                    const props = data.services[0].properties;
+                // 适配你当前的 OBS 数据结构
+                if (data.notify_data?.body?.services && data.notify_data.body.services[0]?.properties) {
+                    const props = data.notify_data.body.services[0].properties;
                     item = {
                         image_id: props.image_id || '-',
                         detect_result: props.detect_result || '-',
                         detect_value: props.detect_value || '-',
-                        report_time: data.header?.time_stamp || new Date().toLocaleString()
+                        report_time: props.report_time || data.event_time_ms || new Date().toLocaleString()
                     };
                 } else {
                     item = data;
@@ -70,7 +72,7 @@
             })
             .catch(err => {
                 errorTip.textContent = "加载失败：" + err.message;
-                console.log("错误详情：", err);
+                console.log("完整错误：", err);
             });
         }
 
