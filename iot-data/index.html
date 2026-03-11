@@ -57,8 +57,6 @@
               </ul>
               <ul class="current">
                 <li class="toctree-l1 current"><a class="reference internal current" href="#">IoT数据展示</a>
-    <ul class="current">
-    </ul>
                 </li>
               </ul>
       </div>
@@ -84,88 +82,110 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="iotdaobs">共享单车检测数据（IoTDA+OBS）</h1>
-<p>{% raw %}</p>
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <title>IoTDA → OBS 数据展示</title>
-    <style>
-        table {width: 100%; border-collapse: collapse; margin: 20px 0;}
-        th, td {border: 1px solid #ddd; padding: 8px; text-align: center;}
-        th {background: #f8f8f8;}
-        .error {color: red; margin: 10px 0;}
-    </style>
-</head>
-<body>
-    <h1>共享单车检测数据（IoTDA+OBS）</h1>
-    <div class="error" id="errorTip"></div>
-    <button onclick="loadData()">刷新数据</button>
-    <table id="dataTable">
-        <thead>
-            <tr>
-                <th>图像ID</th>
-                <th>检测结果</th>
-                <th>置信度</th>
-                <th>上报时间</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
+                <div id="status" style="color: orange;">正在加载数据...</div>
+<p><button id="refreshBtn" style="margin: 10px 0;">刷新数据</button></p>
+<table id="dataTable" border="1" cellpadding="8" style="border-collapse: collapse; width: 100%;">
+  <thead>
+    <tr>
+      <th>图像ID</th>
+      <th>检测结果</th>
+      <th>置信度</th>
+      <th>上报时间</th>
+    </tr>
+  </thead>
+  <tbody id="tableBody"></tbody>
+</table>
 
-    <script>
-        // 指向你 OBS 里的 camera_data 文件
-        const OBS_URL = "https://iotda-camera-data.obs.cn-south-1.myhuaweicloud.com/camera_data";
+<div id="chartContainer" style="width: 100%; height: 400px; margin-top: 20px;"></div>
 
-        function loadData() {
-            const errorTip = document.getElementById("errorTip");
-            errorTip.textContent = "";
-            const url = OBS_URL + "?t=" + new Date().getTime();
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<script>
+const OBS_URL = "https://iotda-camera-data.obs.cn-south-1.myhuaweicloud.com/camera_data";
+const statusEl = document.getElementById("status");
+const tableBody = document.getElementById("tableBody");
+const refreshBtn = document.getElementById("refreshBtn");
+const chartContainer = document.getElementById("chartContainer");
+let myChart = null;
 
-            fetch(url, { mode: "cors" })
-            .then(res => {
-                if (!res.ok) throw new Error(`OBS 访问失败：${res.status}`);
-                return res.json();
-            })
-            .then(data => {
-                const tbody = document.querySelector("#dataTable tbody");
-                tbody.innerHTML = "";
-                let item = {};
+// 初始化图表
+function initChart() {
+  if (myChart) myChart.dispose();
+  myChart = echarts.init(chartContainer);
+}
 
-                // 适配你当前的 OBS 数据结构
-                if (data.notify_data?.body?.services && data.notify_data.body.services[0]?.properties) {
-                    const props = data.notify_data.body.services[0].properties;
-                    item = {
-                        image_id: props.image_id || '-',
-                        detect_result: props.detect_result || '-',
-                        detect_value: props.detect_value || '-',
-                        report_time: props.report_time || data.event_time_ms || new Date().toLocaleString()
-                    };
-                } else {
-                    item = data;
-                }
+// 解析 OBS 数据（每行一个 JSON 对象）
+function parseData(text) {
+  const lines = text.trim().split("\n");
+  return lines.map(line => JSON.parse(line));
+}
 
-                const tr = document.createElement("tr");
-                tr.innerHTML = `
-                    <td>${item.image_id}</td>
-                    <td>${item.detect_result}</td>
-                    <td>${item.detect_value}</td>
-                    <td>${item.report_time}</td>
-                `;
-                tbody.appendChild(tr);
-            })
-            .catch(err => {
-                errorTip.textContent = "加载失败：" + err.message;
-                console.log("完整错误：", err);
-            });
-        }
+// 渲染表格
+function renderTable(data) {
+  tableBody.innerHTML = "";
+  data.forEach(item => {
+    const props = item.notify_data.body.services[0].properties;
+    const row = `
+      <tr>
+        <td>${props.image_id}</td>
+        <td>${props.detect_result}</td>
+        <td>${props.detect_value}</td>
+        <td>${props.report_time}</td>
+      </tr>
+    `;
+    tableBody.innerHTML += row;
+  });
+}
 
-        window.onload = loadData;
-    </script>
-</body>
-</html>
-<p>{% endraw %}</p>
+// 渲染 ECharts 折线图（展示置信度随时间变化）
+function renderChart(data) {
+  const xData = data.map(item => item.notify_data.body.services[0].properties.report_time);
+  const yData = data.map(item => parseFloat(item.notify_data.body.services[0].properties.detect_value));
+
+  const option = {
+    title: { text: '共享单车检测置信度趋势' },
+    xAxis: { type: 'category', data: xData },
+    yAxis: { type: 'value', min: 0, max: 1 },
+    tooltip: { trigger: 'axis' },
+    series: [{
+      name: '置信度',
+      type: 'line',
+      data: yData,
+      smooth: true
+    }]
+  };
+  myChart.setOption(option);
+}
+
+// 拉取并展示数据
+async function fetchData() {
+  try {
+    statusEl.textContent = "正在加载数据...";
+    statusEl.style.color = "orange";
+    const res = await fetch(OBS_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const data = parseData(text);
+
+    renderTable(data);
+    renderChart(data);
+    statusEl.textContent = `加载成功，共 ${data.length} 条数据`;
+    statusEl.style.color = "green";
+  } catch (err) {
+    statusEl.textContent = `加载失败: ${err.message}`;
+    statusEl.style.color = "red";
+    console.error(err);
+  }
+}
+
+// 绑定刷新按钮
+refreshBtn.addEventListener("click", fetchData);
+
+// 页面加载时初始化
+window.addEventListener("load", () => {
+  initChart();
+  fetchData();
+});
+</script>
               
             </div>
           </div><footer>
