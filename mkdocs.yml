@@ -3,5 +3,8 @@ nav:
   - 主页: index.md
   - 关于我: about.md
   - 社员专栏: member.md
+  - 数据可视化: visual.html
+  - IoT数据展示: iot-data.md  # 这里对应你新建的 iot-data.md
+
 theme:
   name: readthedocs
